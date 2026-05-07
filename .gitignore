@@ -1,0 +1,49 @@
+# Data
+data/
+*.db
+*.db-journal
+*.db-wal
+qdrant_storage/
+
+# WhatsApp session (contains credentials!)
+whatsapp-bridge/session/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# Env files (contains API keys!)
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+*.log.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SSL certs
+ssl/
+
+# Docker volumes
+redis-data/
+backend-data/

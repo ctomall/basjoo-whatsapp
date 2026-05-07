@@ -1,0 +1,20 @@
+{
+  "name": "basjoo-whatsapp-bridge",
+  "version": "1.0.0",
+  "description": "WhatsApp → Basjoo AI Chat Bridge (Baileys protocol)",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js",
+    "test": "echo OK"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "@hapi/boom": "^10.0.1",
+    "express": "^4.18.2",
+    "pino": "^9.1.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
