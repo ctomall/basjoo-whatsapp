@@ -346,15 +346,22 @@ class RedisService:
 _redis_services: Dict[int, RedisService] = {}
 
 
-async def get_redis() -> RedisService:
-    """获取 Redis 服务实例"""
+async def get_redis() -> Optional[RedisService]:
+    """获取 Redis 服务实例（未配置 Redis 时返回 None）"""
     import asyncio
+
+    if not settings.redis_url or not settings.redis_url.strip():
+        return None
 
     loop_id = id(asyncio.get_running_loop())
     service = _redis_services.get(loop_id)
     if service is None:
-        service = RedisService()
-        _redis_services[loop_id] = service
+        try:
+            service = RedisService()
+            _redis_services[loop_id] = service
+        except Exception as e:
+            logger.warning("Redis unavailable (%s), proceeding without Redis", e)
+            return None
     return service
 
 
