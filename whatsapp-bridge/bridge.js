@@ -88,18 +88,26 @@ async function startWhatsApp() {
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
     if (qr) {
+      waState.qrData = qr;
       console.log('\n📱 Scan this QR code with WhatsApp:\n');
       qrcode.generate(qr, { small: true });
+    } else {
+      waState.qrData = null;
     }
 
     if (connection === 'open') {
+      waState.connected = true;
+      waState.phone = sock.user?.id || null;
       console.log('✅ WhatsApp connected!');
+      console.log(`   Phone: ${waState.phone}`);
       console.log(`   Bridge: http://localhost:${BRIDGE_PORT}`);
       console.log(`   Basjoo API: ${BASJOO_API}`);
       console.log(`   Agent: ${BASJOO_AGENT_ID}\n`);
     }
 
     if (connection === 'close') {
+      waState.connected = false;
+      waState.phone = null;
       const shouldReconnect =
         lastDisconnect?.error instanceof Boom &&
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
@@ -174,8 +182,35 @@ async function startWhatsApp() {
 const app = express();
 app.use(express.json());
 
+// WhatsApp connection state (shared with HTTP routes)
+let waState = { connected: false, phone: null, qrData: null };
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', messages_queued: messageQueue.length });
+});
+
+// WhatsApp status & QR management
+app.get('/status', (req, res) => {
+  res.json({
+    connected: waState.connected,
+    phone: waState.phone,
+    has_session: fs.existsSync(path.join(SESSION_DIR, 'creds.json')),
+  });
+});
+
+app.get('/qr', (req, res) => {
+  if (!waState.qrData) {
+    return res.status(404).json({ error: 'No QR code available. WhatsApp may already be connected or not yet started.' });
+  }
+  // Generate QR PNG from data string
+  const QRCode = require('qrcode');
+  QRCode.toBuffer(waState.qrData, { type: 'png', width: 300, margin: 2 }, (err, buffer) => {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to generate QR code' });
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.send(buffer);
+  });
 });
 
 app.get('/messages', (req, res) => {
@@ -194,6 +229,31 @@ app.post('/send', async (req, res) => {
     if (!sock) throw new Error('WhatsApp not connected');
     await sock.sendMessage(to, { text });
     res.json({ status: 'sent' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Logout / disconnect — clears session, shows new QR for re-pairing
+app.post('/logout', async (req, res) => {
+  try {
+    const sock = globalThis.__sock;
+    if (sock) {
+      try { await sock.logout(); } catch (_) {}
+    }
+    // Clear auth state files
+    const authDir = path.join(SESSION_DIR);
+    if (fs.existsSync(authDir)) {
+      for (const f of fs.readdirSync(authDir)) {
+        fs.unlinkSync(path.join(authDir, f));
+      }
+    }
+    waState.connected = false;
+    waState.phone = null;
+    waState.qrData = null;
+    // Trigger reconnect to generate new QR
+    setTimeout(() => startWhatsApp().then(s => { globalThis.__sock = s; }), 1000);
+    res.json({ status: 'logged_out' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
